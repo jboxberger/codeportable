@@ -1,4 +1,4 @@
-<h1 align="center">CodePortable</h1>
+<h1 align="center">Visual Studio Code Portable</h1>
 
 <p align="center">
   <img src="code.png" alt="Visual Studio Code portable launcher" width="120">
@@ -104,6 +104,9 @@ On first run the launcher creates a well-commented `config.ini` next to the EXE:
 |----------------|-------------------------------------------------------------------------|---------|
 | `apiurl`       | API endpoint used to resolve the latest version and its download URL.   | VS Code Stable, win32-x64-archive |
 | `keepversions` | How many previous versions to keep in `old\` (`0` = keep none).         | `5`     |
+| `loglevel`     | Minimum severity written to the logfile next to the EXE (`<ExeName>.log`): `error`, `warn`, or `info`. | `warn` |
+
+The logfile is created **only** when a message of at least `loglevel` occurs, so a cleanly working launcher leaves no logfile behind. Set `loglevel = info` for a full step-by-step trace when diagnosing update or startup problems (timeouts, DNS failures, HTTP errors); `error` logs failures only. The file is truncated once it exceeds 512 KB.
 
 ## Folder layout
 
