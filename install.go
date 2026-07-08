@@ -27,10 +27,18 @@ type updateInfo struct {
 	SHA256Hash     string `json:"sha256hash"`
 }
 
+// updateCheckTimeout begrenzt die Versionsabfrage. Der Check blockiert bei
+// jedem Start den Programmstart, lädt aber nur ein winziges JSON - ein
+// gesunder Server antwortet in unter einer Sekunde. Ohne Netz scheitert der
+// Aufruf meist sofort (DNS-Fehler); nur wenn eine Verbindung besteht, die
+// Pakete verschluckt (Captive Portal, Firewall), läuft er in den Timeout.
+// Kurz gewählt, damit VS Code in diesem Fall nicht sekundenlang hängt.
+const updateCheckTimeout = 5 * time.Second
+
 // fetchLatest fragt die aktuellste verfügbare Code-Version beim in der
 // config.ini hinterlegten API-Endpunkt ab.
 func fetchLatest(apiURL string) (*updateInfo, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: updateCheckTimeout}
 	resp, err := client.Get(apiURL)
 	if err != nil {
 		return nil, err
