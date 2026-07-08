@@ -1,0 +1,9 @@
+# Build-Artefakte
+*.exe
+*.syso
+
+# Zur Laufzeit erzeugte Dateien
+/current/
+/old/
+/config.ini
+/install.tmp/
