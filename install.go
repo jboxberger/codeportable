@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// errCanceled signalisiert einen Abbruch durch den Benutzer.
+// errCanceled signals a cancellation by the user.
 var errCanceled = errors.New("vom Benutzer abgebrochen")
 
 type updateInfo struct {
@@ -27,16 +27,17 @@ type updateInfo struct {
 	SHA256Hash     string `json:"sha256hash"`
 }
 
-// updateCheckTimeout begrenzt die Versionsabfrage. Der Check blockiert bei
-// jedem Start den Programmstart, lädt aber nur ein winziges JSON - ein
-// gesunder Server antwortet in unter einer Sekunde. Ohne Netz scheitert der
-// Aufruf meist sofort (DNS-Fehler); nur wenn eine Verbindung besteht, die
-// Pakete verschluckt (Captive Portal, Firewall), läuft er in den Timeout.
-// Kurz gewählt, damit VS Code in diesem Fall nicht sekundenlang hängt.
+// updateCheckTimeout limits the version query. The check blocks the
+// program start on every launch, but only downloads a tiny JSON - a
+// healthy server answers in under a second. Without a network the call
+// usually fails immediately (DNS error); only when a connection exists
+// that swallows packets (captive portal, firewall) does it run into the
+// timeout. Chosen short so that VS Code does not hang for seconds in that
+// case.
 const updateCheckTimeout = 5 * time.Second
 
-// fetchLatest fragt die aktuellste verfügbare Code-Version beim in der
-// config.ini hinterlegten API-Endpunkt ab.
+// fetchLatest queries the latest available Code version from the API
+// endpoint configured in config.ini.
 func fetchLatest(apiURL string) (*updateInfo, error) {
 	client := &http.Client{Timeout: updateCheckTimeout}
 	resp, err := client.Get(apiURL)
@@ -57,9 +58,9 @@ func fetchLatest(apiURL string) (*updateInfo, error) {
 	return &info, nil
 }
 
-// downloadZip lädt die ZIP nach destPath, meldet den Fortschritt über
-// progress(done, total), prüft die SHA-256-Prüfsumme und bricht ab, sobald
-// canceled() true liefert.
+// downloadZip downloads the ZIP to destPath, reports progress via
+// progress(done, total), verifies the SHA-256 checksum and aborts as soon
+// as canceled() returns true.
 func downloadZip(info *updateInfo, destPath string, canceled func() bool, progress func(done, total int64)) error {
 	resp, err := http.Get(info.URL)
 	if err != nil {
@@ -116,10 +117,10 @@ func downloadZip(info *updateInfo, destPath string, canceled func() bool, progre
 	return nil
 }
 
-// extractZip entpackt die Code-ZIP nach destDir, meldet den Fortschritt
-// über progress(done, total) je entpackter Datei und bricht ab, sobald
-// canceled() true liefert. Die Portable-ZIP enthält Code.exe direkt auf
-// oberster Ebene.
+// extractZip extracts the Code ZIP to destDir, reports progress via
+// progress(done, total) per extracted file and aborts as soon as
+// canceled() returns true. The portable ZIP contains Code.exe directly at
+// the top level.
 func extractZip(zipPath, destDir string, canceled func() bool, progress func(done, total int)) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -133,7 +134,7 @@ func extractZip(zipPath, destDir string, canceled func() bool, progress func(don
 			return errCanceled
 		}
 		target := filepath.Join(destDir, filepath.FromSlash(f.Name))
-		// Schutz vor Zip-Slip (Pfade wie "..\..\foo").
+		// Protection against zip slip (paths like "..\..\foo").
 		rel, err := filepath.Rel(destDir, target)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 			return fmt.Errorf("unzulässiger Pfad im Archiv: %s", f.Name)
@@ -171,8 +172,8 @@ func extractZip(zipPath, destDir string, canceled func() bool, progress func(don
 	return nil
 }
 
-// copyDir kopiert einen Ordner rekursiv (für die Übernahme der
-// Benutzerdaten in die neue Version).
+// copyDir copies a folder recursively (for carrying over the user data
+// into the new version).
 func copyDir(src, dst string) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

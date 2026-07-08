@@ -9,11 +9,13 @@ import (
 	"strings"
 )
 
-// defaultAPIURL liefert Metadaten (Download-URL, Version, SHA-256) zur
-// aktuellsten Portable-Version (win32-x64-archive = ZIP) im Stable-Kanal.
+// defaultAPIURL returns metadata (download URL, version, SHA-256) for the
+// latest portable version (win32-x64-archive = ZIP) on the stable channel.
 const defaultAPIURL = "https://update.code.visualstudio.com/api/update/win32-x64-archive/stable/latest"
 
 const defaultKeepVersions = 5
+
+const defaultLogLevel = "warn"
 
 const configTemplate = `; =====================================================================
 ; Code Portable Launcher - Configuration
@@ -47,27 +49,42 @@ const configTemplate = `; ======================================================
 ;
 ; Default: %d   (0 = keep none, delete every previous version)
 ;
+; loglevel
+; --------
+; Minimum severity written to the logfile next to the EXE
+; (<ExeName>.log). The logfile is created only once a message of at
+; least this level occurs, so at the default level a cleanly working
+; launcher writes no logfile at all.
+;
+;   error   only failures
+;   warn    failures + warnings, e.g. update check offline (default)
+;   info    full trace of every step (use for debugging)
+;
+; Default: %s
+;
 ; =====================================================================
 
 [update]
 apiurl = %s
 keepversions = %d
+loglevel = %s
 `
 
 type config struct {
 	APIURL       string
 	KeepVersions int
+	LogLevel     string
 }
 
-// loadConfig liest die config.ini neben der EXE ein. Existiert sie noch
-// nicht (erster Lauf), wird sie mit Standardwerten und Erklärkommentar
-// angelegt.
+// loadConfig reads the config.ini next to the EXE. If it does not exist
+// yet (first run), it is created with default values and an explanatory
+// comment.
 func loadConfig(path string) *config {
-	cfg := &config{APIURL: defaultAPIURL, KeepVersions: defaultKeepVersions}
+	cfg := &config{APIURL: defaultAPIURL, KeepVersions: defaultKeepVersions, LogLevel: defaultLogLevel}
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		content := fmt.Sprintf(configTemplate, defaultKeepVersions, defaultAPIURL, defaultKeepVersions)
+		content := fmt.Sprintf(configTemplate, defaultKeepVersions, defaultLogLevel, defaultAPIURL, defaultKeepVersions, defaultLogLevel)
 		if writeErr := os.WriteFile(path, []byte(content), 0o644); writeErr != nil {
 			fatal("config.ini konnte nicht angelegt werden:\n" + writeErr.Error())
 		}
@@ -92,6 +109,10 @@ func loadConfig(path string) *config {
 		case "keepversions":
 			if n, err := strconv.Atoi(value); err == nil && n >= 0 {
 				cfg.KeepVersions = n
+			}
+		case "loglevel":
+			if value != "" {
+				cfg.LogLevel = value
 			}
 		}
 	}

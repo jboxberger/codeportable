@@ -10,11 +10,10 @@ import (
 	"unsafe"
 )
 
-// Natives Win32-Fortschrittsfenster (Statustext + Progressbar + Abbrechen-
-// Knopf) ohne externe Abhängigkeiten. Die Fensterklasse und die
-// Nachrichtenschleife laufen auf einem eigenen, gesperrten OS-Thread;
-// SetStatus/SetProgress dürfen aus beliebigen Goroutinen aufgerufen werden
-// (SendMessage ist threadsicher).
+// Native Win32 progress window (status text + progress bar + cancel
+// button) without external dependencies. The window class and the message
+// loop run on their own, locked OS thread; SetStatus/SetProgress may be
+// called from any goroutine (SendMessage is thread-safe).
 
 const (
 	wsCaption = 0x00C00000
@@ -35,7 +34,7 @@ const (
 	wmSetIcon        = 0x0080
 	wmCommand        = 0x0111
 	wmCtlColorStatic = 0x0138
-	wmAppClose       = 0x8000 + 1 // WM_APP + 1: Fenster vom eigenen Thread schließen
+	wmAppClose       = 0x8000 + 1 // WM_APP + 1: close window from its own thread
 
 	colorWindow    = 5
 	transparentBk  = 1
@@ -49,7 +48,7 @@ const (
 	cancelBtnID = 1
 )
 
-// GWL_STYLE ist -16; als uintptr im Zweierkomplement ausgedrückt.
+// GWL_STYLE is -16; expressed as a uintptr in two's complement.
 const gwlStyle = ^uintptr(15)
 
 var (
@@ -90,8 +89,8 @@ var (
 	appIconHandle uintptr
 	appIconResID  uintptr
 
-	// Es existiert höchstens ein Fortschrittsfenster gleichzeitig; wndProc
-	// braucht Zugriff darauf, um Abbrechen-Klicks zuzuordnen.
+	// At most one progress window exists at a time; wndProc needs access
+	// to it in order to attribute cancel clicks.
 	activeProgress atomic.Pointer[progressWin]
 )
 
@@ -129,7 +128,7 @@ type rect struct {
 func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	switch msg {
 	case wmClose:
-		// X-Knopf = Abbrechen; das Fenster schließt der Installationsablauf.
+		// X button = cancel; the window is closed by the install flow.
 		if p := activeProgress.Load(); p != nil {
 			p.requestCancel()
 		}
@@ -156,10 +155,10 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	return ret
 }
 
-// loadAppIcon sucht das in die EXE eingebettete Anwendungs-Icon. Die von
-// rsrc vergebene Ressourcen-ID hängt davon ab, welche Ressourcen eingebettet
-// wurden (das Manifest belegt z. B. ID 1), daher werden die ersten IDs
-// durchprobiert statt eine feste anzunehmen.
+// loadAppIcon looks for the application icon embedded in the EXE. The
+// resource ID assigned by rsrc depends on which resources were embedded
+// (the manifest occupies ID 1, for example), so the first IDs are tried
+// instead of assuming a fixed one.
 func loadAppIcon() {
 	appIconOnce.Do(func() {
 		hInst, _, _ := procGetModuleHandle.Call(0)
@@ -173,13 +172,13 @@ func loadAppIcon() {
 	})
 }
 
-// appIcon liefert das Icon-Handle des Anwendungs-Icons (0 wenn keines).
+// appIcon returns the icon handle of the application icon (0 if none).
 func appIcon() uintptr {
 	loadAppIcon()
 	return appIconHandle
 }
 
-// appIconID liefert die Ressourcen-ID des Anwendungs-Icons (0 wenn keines).
+// appIconID returns the resource ID of the application icon (0 if none).
 func appIconID() uintptr {
 	loadAppIcon()
 	return appIconResID
@@ -223,8 +222,8 @@ type progressWin struct {
 	wg       sync.WaitGroup
 }
 
-// newProgressWin erzeugt das Fortschrittsfenster und startet dessen
-// Nachrichtenschleife auf einem eigenen Thread.
+// newProgressWin creates the progress window and starts its message loop
+// on its own thread.
 func newProgressWin(title string) *progressWin {
 	p := &progressWin{}
 	created := make(chan struct{})
@@ -264,7 +263,7 @@ func (p *progressWin) create(title string) {
 	const pad, labelH, barH, btnW, btnH, clientW = 14, 20, 18, 90, 26, 440
 	clientH := pad + labelH + 10 + barH + 12 + btnH + pad
 
-	// Fensterrahmen zur Client-Größe addieren und Fenster zentrieren.
+	// Add the window frame to the client size and center the window.
 	r := rect{0, 0, scale(clientW), scale(clientH)}
 	procAdjustWindowRect.Call(uintptr(unsafe.Pointer(&r)), wsCaption|wsSysMenu, 0)
 	winW := r.right - r.left
@@ -312,7 +311,7 @@ func (p *progressWin) create(title string) {
 		uintptr(scale(btnW)), uintptr(scale(btnH)),
 		p.hwnd, cancelBtnID, hInst, 0)
 
-	// Standard-GUI-Schrift (Segoe UI) in Systemgröße.
+	// Standard GUI font (Segoe UI) at system size.
 	fontPtr, _ := syscall.UTF16PtrFromString("Segoe UI")
 	font, _, _ := procCreateFont.Call(uintptr(int32(-int(dpi)*9/72)), 0, 0, 0,
 		fwNormal, 0, 0, 0, defaultCharset, 0, 0, cleartype, 0,
@@ -322,7 +321,7 @@ func (p *progressWin) create(title string) {
 		procSendMessage.Call(p.btn, wmSetFont, font, 1)
 	}
 
-	// Eingebettetes Icon auch für Titelleiste/Taskleiste setzen.
+	// Set the embedded icon for the title bar/taskbar too.
 	if icon := appIcon(); icon != 0 {
 		procSendMessage.Call(p.hwnd, wmSetIcon, 0, icon)
 		procSendMessage.Call(p.hwnd, wmSetIcon, 1, icon)
@@ -333,7 +332,7 @@ func (p *progressWin) create(title string) {
 	procSetForegroundWin.Call(p.hwnd)
 }
 
-// requestCancel wird vom GUI-Thread bei Klick auf Abbrechen/X aufgerufen.
+// requestCancel is called by the GUI thread when cancel/X is clicked.
 func (p *progressWin) requestCancel() {
 	if p.canceled.CompareAndSwap(false, true) {
 		procEnableWindow.Call(p.btn, 0)
@@ -341,25 +340,25 @@ func (p *progressWin) requestCancel() {
 	}
 }
 
-// Canceled meldet, ob der Benutzer den Vorgang abgebrochen hat.
+// Canceled reports whether the user has canceled the operation.
 func (p *progressWin) Canceled() bool {
 	return p.canceled.Load()
 }
 
-// DisableCancel graut den Abbrechen-Knopf aus; ab hier ist der Vorgang
-// nicht mehr abbrechbar (Einzugsphase).
+// DisableCancel grays out the cancel button; from here on the operation
+// can no longer be canceled (activation phase).
 func (p *progressWin) DisableCancel() {
 	procEnableWindow.Call(p.btn, 0)
 }
 
-// SetStatus setzt den Text über der Progressbar.
+// SetStatus sets the text above the progress bar.
 func (p *progressWin) SetStatus(text string) {
 	t, _ := syscall.UTF16PtrFromString(text)
 	procSetWindowText.Call(p.label, uintptr(unsafe.Pointer(t)))
 }
 
-// SetProgress aktualisiert die Progressbar. Bei unbekannter Gesamtgröße
-// (total <= 0) läuft die Leiste im Marquee-Modus.
+// SetProgress updates the progress bar. When the total size is unknown
+// (total <= 0) the bar runs in marquee mode.
 func (p *progressWin) SetProgress(done, total int64) {
 	if total <= 0 {
 		if !p.marquee {
@@ -377,7 +376,7 @@ func (p *progressWin) SetProgress(done, total int64) {
 	procSendMessage.Call(p.bar, pbmSetPos, uintptr(done*1000/total), 0)
 }
 
-// Close schließt das Fenster und wartet, bis der GUI-Thread beendet ist.
+// Close closes the window and waits until the GUI thread has finished.
 func (p *progressWin) Close() {
 	procPostMessage.Call(p.hwnd, wmAppClose, 0, 0)
 	p.wg.Wait()

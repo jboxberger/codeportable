@@ -7,10 +7,9 @@ import (
 	"unsafe"
 )
 
-// Rückfragen und Fehlermeldungen laufen über native Windows-Dialoge
-// (MessageBoxW/MessageBoxIndirectW). Es werden nur Windows-System-
-// bibliotheken benutzt, die immer vorhanden sind - keine externen
-// Abhängigkeiten.
+// Prompts and error messages run through native Windows dialogs
+// (MessageBoxW/MessageBoxIndirectW). Only Windows system libraries that
+// are always present are used - no external dependencies.
 
 const (
 	mbOK                = 0x00000000
@@ -36,8 +35,8 @@ var (
 	procOpenMutex          = kernel32.NewProc("OpenMutexW")
 )
 
-// isMutexHeld prüft, ob ein benannter Windows-Mutex existiert (d. h. von
-// irgendeinem Prozess gehalten wird).
+// isMutexHeld checks whether a named Windows mutex exists (i.e. is held
+// by some process).
 func isMutexHeld(name string) bool {
 	p, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
@@ -52,8 +51,8 @@ func isMutexHeld(name string) bool {
 	return true
 }
 
-// msgBoxParams entspricht MSGBOXPARAMSW; erlaubt eine MessageBox mit
-// eigenem Icon aus den EXE-Ressourcen (MB_USERICON).
+// msgBoxParams corresponds to MSGBOXPARAMSW; allows a message box with a
+// custom icon from the EXE resources (MB_USERICON).
 type msgBoxParams struct {
 	cbSize             uint32
 	hwndOwner          uintptr
@@ -67,8 +66,8 @@ type msgBoxParams struct {
 	dwLanguageID       uint32
 }
 
-// messageBox zeigt einen nativen Windows-Dialog an und liefert die
-// gedrückte Schaltfläche zurück (z. B. idYes).
+// messageBox shows a native Windows dialog and returns the button that
+// was pressed (e.g. idYes).
 func messageBox(title, text string, flags uint32) int {
 	t, _ := syscall.UTF16PtrFromString(text)
 	c, _ := syscall.UTF16PtrFromString(title)
@@ -79,8 +78,8 @@ func messageBox(title, text string, flags uint32) int {
 	return int(ret)
 }
 
-// askYesNo zeigt eine Ja/Nein-Rückfrage mit dem Anwendungs-Icon statt des
-// Standard-Fragezeichens; Fallback ist die klassische Frage-MessageBox.
+// askYesNo shows a yes/no prompt with the application icon instead of the
+// default question mark; the fallback is the classic question message box.
 func askYesNo(title, text string) bool {
 	if iconID := appIconID(); iconID != 0 {
 		t, _ := syscall.UTF16PtrFromString(text)

@@ -16,7 +16,7 @@ func TestIsNewer(t *testing.T) {
 		{"1.128.0", "1.120.0", true},
 		{"1.120.0", "1.128.0", false},
 		{"1.120.0", "1.120.0", false},
-		{"1.9.0", "1.10.0", false}, // numerisch, nicht lexikografisch
+		{"1.9.0", "1.10.0", false}, // numeric, not lexicographic
 		{"1.10.0", "1.9.0", true},
 		{"2.0.0", "1.128.5", true},
 	}

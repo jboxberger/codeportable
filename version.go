@@ -8,10 +8,10 @@ import (
 	"unsafe"
 )
 
-// Fallback für die Versionserkennung: Die Produktversion wird direkt aus
-// der Versionsressource der Code.exe gelesen (version.dll ist eine
-// Windows-Systembibliothek). Damit ist die Erkennung unabhängig vom
-// Verzeichnislayout des Code-Archivs.
+// Fallback for version detection: the product version is read directly
+// from Code.exe's version resource (version.dll is a Windows system
+// library). This makes detection independent of the Code archive's
+// directory layout.
 
 var (
 	versionDLL                 = syscall.NewLazyDLL("version.dll")
@@ -36,8 +36,8 @@ type vsFixedFileInfo struct {
 	FileDateLS       uint32
 }
 
-// fileProductVersion liest die Produktversion (z. B. "1.128.0") aus der
-// Versionsressource einer EXE. Liefert "" bei Fehlern.
+// fileProductVersion reads the product version (e.g. "1.128.0") from an
+// EXE's version resource. Returns "" on errors.
 func fileProductVersion(path string) string {
 	p, err := syscall.UTF16PtrFromString(path)
 	if err != nil {

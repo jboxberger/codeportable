@@ -2,6 +2,10 @@
 *.exe
 *.syso
 
+# Laufzeit-Log neben der EXE
+*.log
+*.log.old
+
 # Zur Laufzeit erzeugte Dateien
 /current/
 /old/
