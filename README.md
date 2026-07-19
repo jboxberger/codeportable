@@ -143,16 +143,18 @@ go test ./...
 
 ## Source overview
 
-| File            | Purpose                                                       |
-|-----------------|---------------------------------------------------------------|
-| `main.go`       | Flow control: first run, update check, archiving, launch      |
-| `install.go`    | Version query, checksummed download, extraction, copy         |
+| File            | Purpose                                                        |
+|-----------------|----------------------------------------------------------------|
+| `main.go`       | Flow control: first run, update check, archiving, launch       |
+| `install.go`    | Version query, checksummed download, extraction, background copy |
 | `config.go`     | Read `config.ini` (created on first run)                       |
-| `progressui.go` | Native Win32 progress window (status, progress bar, cancel)   |
-| `winui.go`      | Native message-box dialogs                                    |
+| `progressui.go` | Win32 progress window (status, progress bar, cancel)           |
+| `dialog.go`     | Self-drawn Win32 dialog (auto-sized, English buttons)          |
+| `winui.go`      | Dialog helpers (Yes/No, error, retry/continue/cancel)          |
+| `log.go`        | Logfile next to the EXE (levels, lazy creation)                |
 | `version.go`    | Read product version from the EXE version resource            |
-| `main_test.go`  | Tests for version comparison, pruning, archive naming         |
-| `build.ps1`     | Build script incl. icon/manifest embedding                    |
+| `main_test.go`  | Tests for version comparison, pruning, archive naming          |
+| `build.ps1`     | Build script incl. icon/manifest embedding                     |
 
 ## FAQ
 
