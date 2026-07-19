@@ -36,6 +36,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -174,8 +175,39 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	logInfo("installation started: version %s from %s", info.ProductVersion, info.URL)
 
 	win := newProgressWin(appTitle)
+
+	// Copy the user data of the previous installation in the BACKGROUND,
+	// in parallel with download and extraction - the copy is usually the
+	// slowest step (extensions can be hundreds of MB). It is staged to
+	// install.tmp\data; after extraction it only needs a single rename into
+	// the new current. The original stays fully in the version archive.
+	oldData := filepath.Join(currentDir, "data")
+	stagedData := filepath.Join(stagingDir, "data")
+	var copyDone chan error // nil = no previous data to carry over
+	var copyAbort atomic.Bool
+	if _, err := os.Stat(oldData); err == nil {
+		copyDone = make(chan error, 1)
+		go func() {
+			start := time.Now()
+			err := copyDir(oldData, stagedData, func() bool { return copyAbort.Load() || win.Canceled() })
+			if err == nil {
+				logInfo("user data copied in background in %s", time.Since(start).Round(time.Millisecond))
+			}
+			copyDone <- err
+		}()
+	}
+	// stopCopy aborts a still-running background copy and waits for it to
+	// finish - it MUST run before install.tmp is deleted on any exit path.
+	stopCopy := func() {
+		copyAbort.Store(true)
+		if copyDone != nil {
+			<-copyDone
+		}
+	}
+
 	fail := func(msg string) {
 		win.Close()
+		stopCopy()
 		os.RemoveAll(stagingDir)
 		fatal(msg)
 	}
@@ -202,6 +234,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	if err == errCanceled {
 		logInfo("download canceled by user")
 		win.Close()
+		stopCopy()
 		os.RemoveAll(stagingDir)
 		return false
 	}
@@ -222,6 +255,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	if err == errCanceled {
 		logInfo("extraction canceled by user")
 		win.Close()
+		stopCopy()
 		os.RemoveAll(stagingDir)
 		return false
 	}
@@ -232,21 +266,41 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	logInfo("extraction finished")
 	os.Remove(zipPath)
 
-	// Phase 3: activate - no longer cancelable from here on.
+	// Phase 3: activate - no longer cancelable from here on. (win.Canceled()
+	// is guaranteed false here, so the background copy can no longer abort.)
 	win.DisableCancel()
 	win.SetStatus("Code " + info.ProductVersion + " wird installiert ...")
 	win.SetProgress(0, 0) // Marquee: duration unknown
 
-	// COPY the user data of the previous installation into the new state
-	// - the original stays fully in the version archive.
-	oldData := filepath.Join(currentDir, "data")
+	// Collect the background copy of the user data: if it is still running,
+	// wait for it with its own status; then a single rename moves the
+	// staged data into the new current.
 	newData := filepath.Join(newCurrent, "data")
-	if _, err := os.Stat(oldData); err == nil {
-		win.SetStatus("Benutzerdaten werden übernommen ...")
-		if err := copyDir(oldData, newData); err != nil {
+	if copyDone != nil {
+		var copyErr error
+		select {
+		case copyErr = <-copyDone: // already finished during download/extract
+		default:
+			logInfo("waiting for background user data copy")
+			win.SetStatus("Benutzerdaten werden übernommen ...")
+			copyErr = <-copyDone
+			win.SetStatus("Code " + info.ProductVersion + " wird installiert ...")
+		}
+		// The channel is drained and the goroutine has exited; clear copyDone
+		// so a following fail() -> stopCopy() does not block on it forever.
+		copyDone = nil
+		if copyErr != nil {
+			logError("user data copy failed: %v", copyErr)
+			fail("Das Update konnte nicht abgeschlossen werden.\n\n" +
+				"Ihre Benutzerdaten (Einstellungen, Erweiterungen) ließen sich nicht kopieren - " +
+				"vermutlich ist noch ein VS-Code-Fenster geöffnet, das Dateien sperrt.\n\n" +
+				"Bitte schließen Sie alle VS-Code-Instanzen und starten Sie erneut.\n\n" +
+				"Details: " + copyErr.Error())
+		}
+		if err := renameRetry(stagedData, newData); err != nil {
+			logError("moving staged user data failed: %v", err)
 			fail("Benutzerdaten konnten nicht übernommen werden:\n\n" + err.Error())
 		}
-		win.SetStatus("Code " + info.ProductVersion + " wird installiert ...")
 	} else if err := os.MkdirAll(newData, 0o755); err != nil {
 		fail("Data-Ordner konnte nicht erstellt werden:\n\n" + err.Error())
 	}

@@ -173,11 +173,14 @@ func extractZip(zipPath, destDir string, canceled func() bool, progress func(don
 }
 
 // copyDir copies a folder recursively (for carrying over the user data
-// into the new version).
-func copyDir(src, dst string) error {
+// into the new version) and aborts as soon as canceled() returns true.
+func copyDir(src, dst string, canceled func() bool) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if canceled() {
+			return errCanceled
 		}
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
