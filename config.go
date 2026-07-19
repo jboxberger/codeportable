@@ -86,7 +86,7 @@ func loadConfig(path string) *config {
 	if err != nil {
 		content := fmt.Sprintf(configTemplate, defaultKeepVersions, defaultLogLevel, defaultAPIURL, defaultKeepVersions, defaultLogLevel)
 		if writeErr := os.WriteFile(path, []byte(content), 0o644); writeErr != nil {
-			fatal("config.ini konnte nicht angelegt werden:\n" + writeErr.Error())
+			fatal("config.ini could not be created:\n" + writeErr.Error())
 		}
 		return cfg
 	}

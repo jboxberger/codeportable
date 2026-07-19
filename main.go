@@ -48,7 +48,7 @@ const (
 func main() {
 	exePath, err := os.Executable()
 	if err != nil {
-		fatal("Eigener Pfad konnte nicht ermittelt werden: " + err.Error())
+		fatal("Could not determine own path: " + err.Error())
 	}
 	baseDir := filepath.Dir(exePath)
 	currentDir := filepath.Join(baseDir, "current")
@@ -74,7 +74,7 @@ func main() {
 		info, err := fetchLatest(cfg.APIURL)
 		if err != nil {
 			logError("version query failed: %v", err)
-			fatal("Versionsabfrage fehlgeschlagen (keine Internetverbindung?):\n\n" + err.Error())
+			fatal("Version query failed (no internet connection?):\n\n" + err.Error())
 		}
 		if !install(cfg, info, stagingDir, baseDir, currentDir) {
 			logInfo("first-time install canceled by user")
@@ -86,7 +86,7 @@ func main() {
 
 	// Portable mode: the data folder next to Code.exe makes the installation portable.
 	if err := os.MkdirAll(filepath.Join(dataDir, "tmp"), 0o755); err != nil {
-		fatal("Data-Ordner konnte nicht erstellt werden: " + err.Error())
+		fatal("Could not create data folder: " + err.Error())
 	}
 
 	waitForOtherUpdater()
@@ -108,15 +108,15 @@ func waitForOtherUpdater() {
 			logged = true
 		}
 		ret := messageBox(appTitle,
-			"Unabhängig von diesem Launcher: Eine andere Code-Installation auf "+
-				"diesem Rechner (z. B. das normal installierte Code) führt gerade "+
-				"ihr eigenes Update durch und hält dabei eine systemweite Sperre. "+
-				"Code startet grundsätzlich nicht, solange diese Sperre besteht.\n\n"+
-				"Abhilfe: alle Fenster der anderen Code-Installation schließen, "+
-				"damit deren Update durchlaufen kann.\n\n"+
-				"Wiederholen:\tSperre erneut prüfen\n"+
-				"Weiter:\ttrotzdem starten (Code wartet selbst bis zu 30 Sekunden)\n"+
-				"Abbrechen:\tbeenden ohne Start",
+			"Unrelated to this launcher: another Code installation on this "+
+				"machine (e.g. the normally installed Code) is currently running "+
+				"its own update and holds a system-wide lock. "+
+				"Code will not start at all while this lock exists.\n\n"+
+				"Fix: close all windows of the other Code installation so its "+
+				"update can finish.\n\n"+
+				"Try Again:\tcheck the lock again\n"+
+				"Continue:\tstart anyway (Code itself waits up to 30 seconds)\n"+
+				"Cancel:\texit without starting",
 			mbCancelTryContinue|mbDefButton2|mbIconWarning)
 		switch ret {
 		case idTryAgain:
@@ -150,9 +150,9 @@ func checkForUpdate(cfg *config, stagingDir, baseDir, currentDir, codeExe string
 	}
 	logInfo("update available: %s -> %s", current, info.ProductVersion)
 
-	msg := fmt.Sprintf("Installiert:\t%s\nVerfügbar:\t%s\n\nJetzt aktualisieren?",
+	msg := fmt.Sprintf("Installed:\t%s\nAvailable:\t%s\n\nUpdate now?",
 		current, info.ProductVersion)
-	if !askYesNo("Update verfügbar", msg) {
+	if !askYesNo("Update available", msg) {
 		logInfo("update declined by user")
 		return
 	}
@@ -169,7 +169,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	os.RemoveAll(stagingDir)
 	newCurrent := filepath.Join(stagingDir, "current")
 	if err := os.MkdirAll(newCurrent, 0o755); err != nil {
-		fatal("Staging-Ordner konnte nicht erstellt werden:\n\n" + err.Error())
+		fatal("Could not create staging folder:\n\n" + err.Error())
 	}
 
 	logInfo("installation started: version %s from %s", info.ProductVersion, info.URL)
@@ -213,7 +213,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	}
 
 	// Phase 1: download into the staging folder (cancelable).
-	statusPrefix := "Code " + info.ProductVersion + " wird heruntergeladen ..."
+	statusPrefix := "Downloading Code " + info.ProductVersion + " ..."
 	win.SetStatus(statusPrefix)
 	zipPath := filepath.Join(stagingDir, "code.zip")
 	err := downloadZip(info, zipPath, win.Canceled, func(done, total int64) {
@@ -222,7 +222,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 			return
 		}
 		if total > 0 {
-			win.SetStatus(fmt.Sprintf("%s  %.1f von %.1f MB", statusPrefix,
+			win.SetStatus(fmt.Sprintf("%s  %.1f of %.1f MB", statusPrefix,
 				float64(done)/1024/1024, float64(total)/1024/1024))
 		} else {
 			win.SetStatus(fmt.Sprintf("%s  %.1f MB", statusPrefix, float64(done)/1024/1024))
@@ -240,12 +240,12 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	}
 	if err != nil {
 		logError("download failed: %v", err)
-		fail("Download fehlgeschlagen:\n\n" + err.Error())
+		fail("Download failed:\n\n" + err.Error())
 	}
 	logInfo("download finished and SHA-256 verified")
 
 	// Phase 2: extract into the staging folder (cancelable).
-	win.SetStatus("Code " + info.ProductVersion + " wird entpackt ...")
+	win.SetStatus("Extracting Code " + info.ProductVersion + " ...")
 	err = extractZip(zipPath, newCurrent, win.Canceled, func(done, total int) {
 		win.SetProgress(int64(done), int64(total))
 	})
@@ -261,7 +261,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	}
 	if err != nil {
 		logError("extraction failed: %v", err)
-		fail("Entpacken fehlgeschlagen:\n\n" + err.Error())
+		fail("Extraction failed:\n\n" + err.Error())
 	}
 	logInfo("extraction finished")
 	os.Remove(zipPath)
@@ -269,7 +269,7 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	// Phase 3: activate - no longer cancelable from here on. (win.Canceled()
 	// is guaranteed false here, so the background copy can no longer abort.)
 	win.DisableCancel()
-	win.SetStatus("Code " + info.ProductVersion + " wird installiert ...")
+	win.SetStatus("Installing Code " + info.ProductVersion + " ...")
 	win.SetProgress(0, 0) // Marquee: duration unknown
 
 	// Collect the background copy of the user data: if it is still running,
@@ -282,27 +282,27 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 		case copyErr = <-copyDone: // already finished during download/extract
 		default:
 			logInfo("waiting for background user data copy")
-			win.SetStatus("Benutzerdaten werden übernommen ...")
+			win.SetStatus("Transferring user data ...")
 			copyErr = <-copyDone
-			win.SetStatus("Code " + info.ProductVersion + " wird installiert ...")
+			win.SetStatus("Installing Code " + info.ProductVersion + " ...")
 		}
 		// The channel is drained and the goroutine has exited; clear copyDone
 		// so a following fail() -> stopCopy() does not block on it forever.
 		copyDone = nil
 		if copyErr != nil {
 			logError("user data copy failed: %v", copyErr)
-			fail("Das Update konnte nicht abgeschlossen werden.\n\n" +
-				"Ihre Benutzerdaten (Einstellungen, Erweiterungen) ließen sich nicht kopieren - " +
-				"vermutlich ist noch ein VS-Code-Fenster geöffnet, das Dateien sperrt.\n\n" +
-				"Bitte schließen Sie alle VS-Code-Instanzen und starten Sie erneut.\n\n" +
+			fail("The update could not be completed.\n\n" +
+				"Your user data (settings, extensions) could not be copied - " +
+				"a Code window is probably still open and locking files.\n\n" +
+				"Please close all Code windows and try again.\n\n" +
 				"Details: " + copyErr.Error())
 		}
 		if err := renameRetry(stagedData, newData); err != nil {
 			logError("moving staged user data failed: %v", err)
-			fail("Benutzerdaten konnten nicht übernommen werden:\n\n" + err.Error())
+			fail("User data could not be transferred:\n\n" + err.Error())
 		}
 	} else if err := os.MkdirAll(newData, 0o755); err != nil {
-		fail("Data-Ordner konnte nicht erstellt werden:\n\n" + err.Error())
+		fail("Could not create data folder:\n\n" + err.Error())
 	}
 
 	// Move the current folder to old\<version> instead of deleting it
@@ -311,13 +311,13 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	oldDir := filepath.Join(baseDir, "old")
 	if _, err := os.Stat(currentDir); err == nil {
 		if err := os.MkdirAll(oldDir, 0o755); err != nil {
-			fail("old-Ordner konnte nicht erstellt werden:\n\n" + err.Error())
+			fail("Could not create the 'old' folder:\n\n" + err.Error())
 		}
 		oldVersion := fileProductVersion(filepath.Join(currentDir, "Code.exe"))
 		archive := archivePath(oldDir, oldVersion)
 		if err := renameRetry(currentDir, archive); err != nil {
 			logError("archiving the old version failed (is Code still running?): %v", err)
-			fail("Update nicht möglich - läuft Code noch?\n\n" + err.Error())
+			fail("Update not possible - is Code still running?\n\n" + err.Error())
 		}
 		logInfo("old version %q archived to %s", oldVersion, filepath.Base(archive))
 	}
@@ -325,10 +325,10 @@ func install(cfg *config, info *updateInfo, stagingDir, baseDir, currentDir stri
 	// Activate the new state (single rename, same drive).
 	if err := renameRetry(newCurrent, currentDir); err != nil {
 		logError("activating the new version failed: %v", err)
-		fail("Neue Version konnte nicht aktiviert werden:\n\n" + err.Error())
+		fail("The new version could not be activated:\n\n" + err.Error())
 	}
 
-	win.SetStatus("Alte Versionen werden aufgeräumt ...")
+	win.SetStatus("Cleaning up old versions ...")
 	pruneOldVersions(oldDir, cfg.KeepVersions)
 
 	logInfo("installation finished: version %s active", info.ProductVersion)
@@ -424,7 +424,7 @@ func launch(codeExe string) {
 	cmd.Args = append(cmd.Args, os.Args[1:]...)
 	if err := cmd.Start(); err != nil {
 		logError("starting %s failed: %v", codeExe, err)
-		fatal("Code konnte nicht gestartet werden:\n\n" + err.Error())
+		fatal("Code could not be started:\n\n" + err.Error())
 	}
 	logInfo("Code started: %s", codeExe)
 }

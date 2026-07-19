@@ -19,7 +19,7 @@ import (
 )
 
 // errCanceled signals a cancellation by the user.
-var errCanceled = errors.New("vom Benutzer abgebrochen")
+var errCanceled = errors.New("canceled by user")
 
 type updateInfo struct {
 	URL            string `json:"url"`
@@ -46,14 +46,14 @@ func fetchLatest(apiURL string) (*updateInfo, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Update-Server antwortete mit HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("update server responded with HTTP %d", resp.StatusCode)
 	}
 	var info updateInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		return nil, err
 	}
 	if info.URL == "" || info.ProductVersion == "" {
-		return nil, fmt.Errorf("unerwartete Antwort des Update-Servers")
+		return nil, fmt.Errorf("unexpected response from the update server")
 	}
 	return &info, nil
 }
@@ -68,7 +68,7 @@ func downloadZip(info *updateInfo, destPath string, canceled func() bool, progre
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Download antwortete mit HTTP %d", resp.StatusCode)
+		return fmt.Errorf("download responded with HTTP %d", resp.StatusCode)
 	}
 
 	out, err := os.Create(destPath)
@@ -111,7 +111,7 @@ func downloadZip(info *updateInfo, destPath string, canceled func() bool, progre
 	if info.SHA256Hash != "" {
 		got := hex.EncodeToString(hash.Sum(nil))
 		if !strings.EqualFold(got, info.SHA256Hash) {
-			return fmt.Errorf("Prüfsummenfehler: erwartet %s, erhalten %s", info.SHA256Hash, got)
+			return fmt.Errorf("checksum mismatch: expected %s, got %s", info.SHA256Hash, got)
 		}
 	}
 	return nil
@@ -137,7 +137,7 @@ func extractZip(zipPath, destDir string, canceled func() bool, progress func(don
 		// Protection against zip slip (paths like "..\..\foo").
 		rel, err := filepath.Rel(destDir, target)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			return fmt.Errorf("unzulässiger Pfad im Archiv: %s", f.Name)
+			return fmt.Errorf("illegal path in archive: %s", f.Name)
 		}
 		if f.FileInfo().IsDir() {
 			if err := os.MkdirAll(target, 0o755); err != nil {

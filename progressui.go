@@ -302,7 +302,7 @@ func (p *progressWin) create(title string) {
 	procSendMessage.Call(p.bar, pbmSetRange32, 0, 1000)
 
 	btnClassPtr, _ := syscall.UTF16PtrFromString("BUTTON")
-	btnTextPtr, _ := syscall.UTF16PtrFromString("Abbrechen")
+	btnTextPtr, _ := syscall.UTF16PtrFromString("Cancel")
 	p.btn, _, _ = procCreateWindowEx.Call(0,
 		uintptr(unsafe.Pointer(btnClassPtr)),
 		uintptr(unsafe.Pointer(btnTextPtr)),
@@ -336,7 +336,7 @@ func (p *progressWin) create(title string) {
 func (p *progressWin) requestCancel() {
 	if p.canceled.CompareAndSwap(false, true) {
 		procEnableWindow.Call(p.btn, 0)
-		p.SetStatus("Wird abgebrochen ...")
+		p.SetStatus("Cancelling ...")
 	}
 }
 

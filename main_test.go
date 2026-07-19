@@ -48,11 +48,11 @@ func TestPruneOldVersionsKeepsNewest(t *testing.T) {
 	}
 	want := []string{"1.121.0", "1.123.0", "1.128.0"}
 	if len(got) != len(want) {
-		t.Fatalf("nach dem Aufräumen %d Ordner, erwartet %d: %v", len(got), len(want), got)
+		t.Fatalf("after pruning %d folders, expected %d: %v", len(got), len(want), got)
 	}
 	for _, v := range want {
 		if !got[v] {
-			t.Errorf("Version %s hätte behalten werden müssen", v)
+			t.Errorf("version %s should have been kept", v)
 		}
 	}
 }
@@ -71,7 +71,7 @@ func TestPruneOldVersionsKeepZeroAndAll(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(entries) != tc.want {
-			t.Errorf("keep=%d: %d Ordner übrig, erwartet %d", tc.keep, len(entries), tc.want)
+			t.Errorf("keep=%d: %d folders left, expected %d", tc.keep, len(entries), tc.want)
 		}
 	}
 }
@@ -81,7 +81,7 @@ func TestArchivePathAvoidsCollision(t *testing.T) {
 
 	first := archivePath(oldDir, "1.120.0")
 	if filepath.Base(first) != "1.120.0" {
-		t.Fatalf("erster Archivname = %q, erwartet 1.120.0", filepath.Base(first))
+		t.Fatalf("first archive name = %q, expected 1.120.0", filepath.Base(first))
 	}
 	if err := os.MkdirAll(first, 0o755); err != nil {
 		t.Fatal(err)
@@ -89,10 +89,10 @@ func TestArchivePathAvoidsCollision(t *testing.T) {
 
 	second := archivePath(oldDir, "1.120.0")
 	if filepath.Base(second) != "1.120.0-2" {
-		t.Errorf("zweiter Archivname = %q, erwartet 1.120.0-2", filepath.Base(second))
+		t.Errorf("second archive name = %q, expected 1.120.0-2", filepath.Base(second))
 	}
 
 	if base := filepath.Base(archivePath(oldDir, "")); base != "backup" {
-		t.Errorf("Archivname ohne Version = %q, erwartet backup", base)
+		t.Errorf("archive name without version = %q, expected backup", base)
 	}
 }
