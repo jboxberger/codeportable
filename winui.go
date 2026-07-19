@@ -7,36 +7,56 @@ import (
 	"unsafe"
 )
 
-// Prompts and error messages run through native Windows dialogs
-// (MessageBoxW/MessageBoxIndirectW). Only Windows system libraries that
-// are always present are used - no external dependencies.
+// User prompts and error messages use self-drawn modal dialogs (see
+// dialog.go) so the button labels stay English regardless of the Windows
+// system language. Only always-present Windows system libraries are used -
+// no external dependencies.
 
+// Button ids returned by the dialogs.
 const (
-	mbOK                = 0x00000000
-	mbYesNo             = 0x00000004
-	mbCancelTryContinue = 0x00000006
-	mbIconError         = 0x00000010
-	mbIconQuestion      = 0x00000020
-	mbIconWarning       = 0x00000030
-	mbUserIcon          = 0x00000080
-	mbDefButton2        = 0x00000100
-	mbTopmost           = 0x00040000
-
+	idOk       = 1
+	idCancel   = 2
 	idYes      = 6
+	idNo       = 7
 	idTryAgain = 10
 	idContinue = 11
 )
 
 var (
-	user32                 = syscall.NewLazyDLL("user32.dll")
-	kernel32               = syscall.NewLazyDLL("kernel32.dll")
-	procMessageBox         = user32.NewProc("MessageBoxW")
-	procMessageBoxIndirect = user32.NewProc("MessageBoxIndirectW")
-	procOpenMutex          = kernel32.NewProc("OpenMutexW")
+	user32        = syscall.NewLazyDLL("user32.dll")
+	kernel32      = syscall.NewLazyDLL("kernel32.dll")
+	procOpenMutex = kernel32.NewProc("OpenMutexW")
 )
 
-// isMutexHeld checks whether a named Windows mutex exists (i.e. is held
-// by some process).
+// errorDialog shows a modal error dialog with a single OK button.
+func errorDialog(title, text string) {
+	icon, _, _ := procLoadIcon.Call(0, idiError)
+	showDialog(title, text, icon, []dialogButton{{"OK", idOk}}, idOk, idOk)
+}
+
+// askYesNo shows a Yes/No prompt with the application icon and returns true
+// when Yes is chosen.
+func askYesNo(title, text string) bool {
+	icon := appIcon()
+	if icon == 0 {
+		icon, _, _ = procLoadIcon.Call(0, idiInfo)
+	}
+	return showDialog(title, text, icon,
+		[]dialogButton{{"Yes", idYes}, {"No", idNo}}, idYes, idNo) == idYes
+}
+
+// askRetryContinueCancel shows a warning dialog with Try Again / Continue /
+// Cancel buttons and returns the clicked button id. Default is Continue;
+// Esc / the window's X map to Cancel.
+func askRetryContinueCancel(title, text string) int {
+	icon, _, _ := procLoadIcon.Call(0, idiWarning)
+	return showDialog(title, text, icon,
+		[]dialogButton{{"Try Again", idTryAgain}, {"Continue", idContinue}, {"Cancel", idCancel}},
+		idContinue, idCancel)
+}
+
+// isMutexHeld reports whether a named Windows mutex exists (i.e. is held by
+// some process).
 func isMutexHeld(name string) bool {
 	p, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
@@ -49,53 +69,4 @@ func isMutexHeld(name string) bool {
 	}
 	syscall.CloseHandle(syscall.Handle(h))
 	return true
-}
-
-// msgBoxParams corresponds to MSGBOXPARAMSW; allows a message box with a
-// custom icon from the EXE resources (MB_USERICON).
-type msgBoxParams struct {
-	cbSize             uint32
-	hwndOwner          uintptr
-	hInstance          uintptr
-	lpszText           uintptr
-	lpszCaption        uintptr
-	dwStyle            uint32
-	lpszIcon           uintptr
-	dwContextHelpID    uintptr
-	lpfnMsgBoxCallback uintptr
-	dwLanguageID       uint32
-}
-
-// messageBox shows a native Windows dialog and returns the button that
-// was pressed (e.g. idYes).
-func messageBox(title, text string, flags uint32) int {
-	t, _ := syscall.UTF16PtrFromString(text)
-	c, _ := syscall.UTF16PtrFromString(title)
-	ret, _, _ := procMessageBox.Call(0,
-		uintptr(unsafe.Pointer(t)),
-		uintptr(unsafe.Pointer(c)),
-		uintptr(flags|mbTopmost))
-	return int(ret)
-}
-
-// askYesNo shows a yes/no prompt with the application icon instead of the
-// default question mark; the fallback is the classic question message box.
-func askYesNo(title, text string) bool {
-	if iconID := appIconID(); iconID != 0 {
-		t, _ := syscall.UTF16PtrFromString(text)
-		c, _ := syscall.UTF16PtrFromString(title)
-		hInst, _, _ := procGetModuleHandle.Call(0)
-		params := msgBoxParams{
-			cbSize:      uint32(unsafe.Sizeof(msgBoxParams{})),
-			hInstance:   hInst,
-			lpszText:    uintptr(unsafe.Pointer(t)),
-			lpszCaption: uintptr(unsafe.Pointer(c)),
-			dwStyle:     mbYesNo | mbUserIcon | mbTopmost,
-			lpszIcon:    iconID,
-		}
-		if ret, _, _ := procMessageBoxIndirect.Call(uintptr(unsafe.Pointer(&params))); ret != 0 {
-			return int(ret) == idYes
-		}
-	}
-	return messageBox(title, text, mbYesNo|mbIconQuestion) == idYes
 }

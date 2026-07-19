@@ -87,7 +87,6 @@ var (
 
 	appIconOnce   sync.Once
 	appIconHandle uintptr
-	appIconResID  uintptr
 
 	// At most one progress window exists at a time; wndProc needs access
 	// to it in order to attribute cancel clicks.
@@ -165,7 +164,6 @@ func loadAppIcon() {
 		for id := uintptr(1); id <= 32; id++ {
 			if h, _, _ := procLoadIcon.Call(hInst, id); h != 0 {
 				appIconHandle = h
-				appIconResID = id
 				return
 			}
 		}
@@ -176,12 +174,6 @@ func loadAppIcon() {
 func appIcon() uintptr {
 	loadAppIcon()
 	return appIconHandle
-}
-
-// appIconID returns the resource ID of the application icon (0 if none).
-func appIconID() uintptr {
-	loadAppIcon()
-	return appIconResID
 }
 
 func registerClass() {

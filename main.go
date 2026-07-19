@@ -107,17 +107,16 @@ func waitForOtherUpdater() {
 			logWarn("system-wide lock 'vscode-updating' active - foreign Code installation is updating; prompting")
 			logged = true
 		}
-		ret := messageBox(appTitle,
+		ret := askRetryContinueCancel(appTitle,
 			"Unrelated to this launcher: another Code installation on this "+
 				"machine (e.g. the normally installed Code) is currently running "+
 				"its own update and holds a system-wide lock. "+
 				"Code will not start at all while this lock exists.\n\n"+
 				"Fix: close all windows of the other Code installation so its "+
 				"update can finish.\n\n"+
-				"Try Again:\tcheck the lock again\n"+
-				"Continue:\tstart anyway (Code itself waits up to 30 seconds)\n"+
-				"Cancel:\texit without starting",
-			mbCancelTryContinue|mbDefButton2|mbIconWarning)
+				"Try Again — check the lock again\n"+
+				"Continue — start anyway (Code itself waits up to 30 seconds)\n"+
+				"Cancel — exit without starting")
 		switch ret {
 		case idTryAgain:
 			continue
@@ -150,7 +149,7 @@ func checkForUpdate(cfg *config, stagingDir, baseDir, currentDir, codeExe string
 	}
 	logInfo("update available: %s -> %s", current, info.ProductVersion)
 
-	msg := fmt.Sprintf("Installed:\t%s\nAvailable:\t%s\n\nUpdate now?",
+	msg := fmt.Sprintf("Installed version:  %s\nAvailable version:  %s\n\nUpdate now?",
 		current, info.ProductVersion)
 	if !askYesNo("Update available", msg) {
 		logInfo("update declined by user")
@@ -434,6 +433,6 @@ func launch(codeExe string) {
 // unbuffered though, so the last line is already on disk.
 func fatal(msg string) {
 	logError("ABORT: %s", msg)
-	messageBox(appTitle, msg, mbOK|mbIconError)
+	errorDialog(appTitle, msg)
 	os.Exit(1)
 }
